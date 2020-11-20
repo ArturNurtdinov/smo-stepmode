@@ -1,4 +1,6 @@
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
@@ -19,6 +21,9 @@ public class MainController {
     private Buffer buffer;
     private SourceManager sourceManager;
     private DeviceManager deviceManager;
+    private Map<Integer, Integer> sourceRequestsCount;
+    private int replaced = 0;
+    private int rejected = 0;
 
     public MainController() {
         sourceCount = BuildConfig.SOURCE_NUMBER;
@@ -32,19 +37,21 @@ public class MainController {
         deviceManager = new DeviceManager(deviceCount, alpha, beta);
         buffer = new Buffer(bufferSize);
         deviceManager.setCurrentPackage(2);
+        sourceRequestsCount = new HashMap<>();
     }
 
     private void checkFreeDevices() {
         List<AcceptedRequest> acceptedRequests = deviceManager.getAcceptedRequests(currentTime);
         for (AcceptedRequest acceptedRequest : acceptedRequests) {
             Request doneRequest = acceptedRequest.getAcceptedRequest();
+
             if (doneRequest != null) {
                 Main.print("Прибор " + acceptedRequest.getDeviceNumber()
                         + " освободился в " + acceptedRequest.getTimeAccept() +
                         ", номер источника заявки - " + doneRequest.getSourceNumber());
             }
-            int packageNumber = deviceManager.getCurrentPackage();
             if (!buffer.isEmpty()) {
+                int packageNumber = deviceManager.getCurrentPackage();
                 Request requestForDevice;
                 if (packageNumber != -1) {
                     requestForDevice = buffer.get(packageNumber);
@@ -58,7 +65,9 @@ public class MainController {
                     deviceManager.setCurrentPackage(requestForDevice.getSourceNumber());
                 }
 
-                int deviceNumber = deviceManager.executeRequest(requestForDevice, currentTime);
+                double timeToPlace = Math.max(requestForDevice.getGeneratedTime(), acceptedRequest.getTimeAccept());
+
+                int deviceNumber = deviceManager.executeRequest(requestForDevice, timeToPlace);
                 Main.print("Заявка от источника номер " + requestForDevice.getSourceNumber() +
                         " загружена на прибор номер " + deviceNumber + " номер обрабатываемого пакета - " + deviceManager.getCurrentPackage());
             }
@@ -71,15 +80,54 @@ public class MainController {
             Request nextRequest = nextRequestPair.getSecond();
             currentTime += nextRequestPair.getFirst();
             checkFreeDevices();
+            sourceRequestsCount.put(nextRequest.getSourceNumber(), sourceRequestsCount.getOrDefault(nextRequest.getSourceNumber(), 0) + 1);
             Main.print("Источник номер " + nextRequest.getSourceNumber() + " создал заявку в " + nextRequest.getGeneratedTime());
 
-            if (buffer.addToBuffer(nextRequest)) {
+            int status = buffer.addToBuffer(nextRequest);
+            if (status == 0) {
                 Main.print("Заявка добавлена без удалений");
+            } else if (status == 1) {
+                Main.print("Заявка попала в буфер, выбив оттуда другую заявку");
+                replaced++;
             } else {
-                Main.print("Заявка либо попала в буфер c замещением, либо ушла в отказ сама");
+                Main.print("Заявка ушла в отказ");
+                rejected++;
             }
-            Main.print("На данный момент в буфере заявки от следующих источников:");
-            Main.print(buffer.getRequests().stream().filter(Objects::nonNull).map(Request::getSourceNumber).collect(Collectors.toList()));
+
+            Main.print("Состояние системы:");
+            showInfo();
         }
+
+        System.out.println("Всего заявок было выбито из буфера: " + replaced);
+        System.out.println("Всего отказанных заявок не попало в буффер: " + rejected);
+    }
+
+    private void showInfo() {
+        System.out.println("Состояние буфера на данный момент (по источникам заявок): ");
+        System.out.println(buffer.getRequests().stream().map(request -> {
+            if (request == null) {
+                return "null";
+            } else {
+                return request.getSourceNumber();
+            }
+        }).collect(Collectors.toList()));
+
+        System.out.println("Источники на данный момент сгенерировали: ");
+        for (int i = 0; i < sourceCount; i++) {
+            System.out.println("Источник " + i + " сгенерировал " + sourceRequestsCount.getOrDefault(i, 0));
+        }
+
+        System.out.println("Приборы на данный момент: ");
+        for (int i = 0; i < deviceCount; i++) {
+            if (deviceManager.get(i).isBusy()) {
+                System.out.println("Прибор " + i + " занят, освободится в " + deviceManager.get(i).getTimeFreed());
+            } else {
+                System.out.println("Прибор " + i + " свободен");
+            }
+        }
+
+        Main.print("Указатель буффера на " + buffer.getIndexPointer() + " элементе");
     }
 }
+// buffer, sources, devices, otkaz 2 varianta
+// indexPointer

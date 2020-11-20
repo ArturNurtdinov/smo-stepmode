@@ -11,7 +11,7 @@ public class Buffer {
 
     public Buffer(int size) {
         this.size = size;
-        this.maxPriority = 3;
+        this.maxPriority = BuildConfig.SOURCE_NUMBER;
         indexPointer = 0;
         requests = new ArrayList<>(size);
     }
@@ -65,17 +65,17 @@ public class Buffer {
         return request;
     }
 
-    public boolean addToBuffer(Request request) {
+    public int addToBuffer(Request request) {
         if (requests.size() < size) {
             requests.add(indexPointer, request);
             incrementPointer();
-            return true;
+            return 0;
         } else {
             int staticPointer = indexPointer;
             for (int i = indexPointer; i < size; i++) {
                 if (requests.get(i) == null) {
                     requests.set(i, request);
-                    return true;
+                    return 0;
                 }
                 incrementPointer();
             }
@@ -83,7 +83,7 @@ public class Buffer {
             for (int i = 0; i < staticPointer; i++) {
                 if (requests.get(i) == null) {
                     requests.set(i, request);
-                    return true;
+                    return 0;
                 }
                 incrementPointer();
             }
@@ -110,7 +110,7 @@ public class Buffer {
                 if (requestsWithLP.values().size() == 1) {
                     requests.set(standaloneIndex, request);
                     indexPointer = standaloneIndex;
-                    return false;
+                    return 1;
                 } else if (requestsWithLP.size() > 0) {
                     Map.Entry<Integer, Request> toReplace = null;
                     for (Map.Entry<Integer, Request> entry : requestsWithLP.entrySet()) {
@@ -121,12 +121,17 @@ public class Buffer {
 
                     requests.set(toReplace.getKey(), request);
                     indexPointer = toReplace.getKey();
-                    return false;
+                    return 1;
                 }
             }
             indexPointer = staticPointer;
-            return false;
+            return 2;
         }
+    }
+
+
+    public int getIndexPointer() {
+        return indexPointer;
     }
 
     public boolean isEmpty() {

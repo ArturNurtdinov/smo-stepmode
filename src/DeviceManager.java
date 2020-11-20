@@ -15,6 +15,10 @@ public class DeviceManager {
         }
     }
 
+    public Device get(int index) {
+        return devices[index];
+    }
+
     private int getFreeDeviceIndex() {
         ArrayList<Pair<Integer, Device>> freeDevices = new ArrayList<>(amountOfDevices);
         for (int i = 0; i < amountOfDevices; i++) {

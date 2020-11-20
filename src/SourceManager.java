@@ -9,7 +9,7 @@ public class SourceManager {
         this.sourcesRequests = new Request[amountOfSources];
         this.requestsTime = new double[amountOfSources];
         for (int i = 0; i < sources.length; ++i) {
-            sources[i] = new Source(i, i + 50);
+            sources[i] = new Source(i, BuildConfig.FREQUENCY);
         }
     }
 
